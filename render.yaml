@@ -7,3 +7,12 @@ services:
     root: breate-frontend
     buildCommand: "npm ci && npm run build"
     publishPath: dist
+services:
+  - type: static
+    name: breate-frontend
+    env: static
+    repo: https://github.com/osgood-andoh-junior/Breate-frontend
+    branch: main
+    root: breate-frontend
+    buildCommand: "npm ci && npm run build"
+    publishPath: dist
