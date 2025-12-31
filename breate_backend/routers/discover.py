@@ -49,9 +49,10 @@ def discover_users(
         {
             "id": user.id,
             "username": user.username,
+            "full_name": user.full_name,
             "bio": user.bio,
             "archetype": user.archetype.name if user.archetype else None,
-            "tier": user.tier.name if user.tier else None,
+            "next_build": user.next_build,
         }
         for user in users
     ]
