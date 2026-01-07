@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -31,14 +33,20 @@ app = FastAPI(
 )
 
 # -------------------------------------------------
-# CORS
+# CORS (Dev + Prod Safe)
 # -------------------------------------------------
+# Set this in production:
+# CORS_ORIGINS=https://your-frontend.vercel.app
+#
+# Local default:
+# http://localhost:3000,http://127.0.0.1:3000
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000"
+    ).split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -124,7 +132,7 @@ def seed_reference_data():
             if not db.query(models.Tier).filter_by(name=name).first():
                 db.add(models.Tier(name=name, level=level, description=description))
 
-        # Coalitions (identity anchors only)
+        # Coalitions
         coalitions = [
             ("University of Ghana", "Academic creative ecosystem", "Education", "Ghana"),
             ("Tech for Good", "Builders using tech for social impact", "Innovation", "Africa"),
@@ -148,5 +156,6 @@ def seed_reference_data():
         print("❌ Error seeding reference data:", str(e))
     finally:
         db.close()
+
 
 
