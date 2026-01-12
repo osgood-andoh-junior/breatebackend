@@ -1,0 +1,17 @@
+## Backend API Notes (Phase 1)
+
+Base URL: http://127.0.0.1:8000
+
+Auth:
+- Login returns JWT access token
+- Token required for protected routes
+
+Key Endpoints:
+- /auth/login
+- /users/me
+- /projects
+- /coalitions
+- /collabcircle
+
+Swagger Docs:
+- /docs
