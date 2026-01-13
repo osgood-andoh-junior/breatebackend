@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 
 from breate_backend.database import get_db
 from breate_backend import models
-from breate_backend.routers.auth import SECRET_KEY, ALGORITHM
+from breate_backend.auth import SECRET_KEY, ALGORITHM, verify_access_token
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/users/login")
 
 
 def get_current_user(
@@ -15,7 +15,8 @@ def get_current_user(
     db: Session = Depends(get_db)
 ) -> models.User:
     """
-    Extracts and validates the current user from JWT token
+    Extracts and validates the current user from JWT token.
+    Token contains email in 'sub' field (from /users/login endpoint).
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -24,16 +25,19 @@ def get_current_user(
     )
 
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str | None = payload.get("sub")
-
-        if user_id is None:
+        payload = verify_access_token(token)
+        # Check token type if present
+        if payload.get("type") and payload.get("type") != "access":
+            raise credentials_exception
+        
+        email: str | None = payload.get("sub")
+        if email is None:
             raise credentials_exception
 
-    except JWTError:
+    except (JWTError, HTTPException):
         raise credentials_exception
 
-    user = db.query(models.User).filter(models.User.id == int(user_id)).first()
+    user = db.query(models.User).filter(models.User.email == email).first()
 
     if user is None:
         raise credentials_exception
