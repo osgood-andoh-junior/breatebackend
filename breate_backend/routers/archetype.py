@@ -17,6 +17,5 @@ def get_archetypes(db: Session = Depends(get_db)):
     Returns all available archetypes.
     """
     archetypes = db.query(models.Archetype).all()
-    if not archetypes:
-        raise HTTPException(status_code=404, detail="No archetypes found")
-    return archetypes
+    # Return empty array instead of 404 if no archetypes found
+    return archetypes or []

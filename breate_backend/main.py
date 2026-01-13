@@ -1,9 +1,11 @@
 import os
 
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+import logging
 
 from breate_backend.database import engine, get_db, SessionLocal
 from breate_backend import models
@@ -12,7 +14,7 @@ from breate_backend import models
 # Import routers
 # -------------------------------------------------
 from breate_backend.routers import (
-    auth,
+    # auth,  # Not used - frontend uses /users/* endpoints instead
     user,
     profile,
     archetype,
@@ -32,24 +34,61 @@ app = FastAPI(
     description="Backend API for the Breate Web App (Phase 1 MVP)",
 )
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    origin = request.headers.get('origin', 'N/A')
+    method = request.method
+    path = request.url.path
+    query = str(request.url.query) if request.url.query else ""
+    full_path = f"{path}?{query}" if query else path
+    
+    logger.info(f"📥 {method} {full_path}")
+    logger.info(f"   Origin: {origin}")
+    logger.info(f"   Headers: {dict(request.headers)}")
+    
+    response = await call_next(request)
+    
+    logger.info(f"📤 {method} {full_path} - Status: {response.status_code}")
+    if response.status_code >= 400:
+        logger.error(f"   ❌ Error response: {response.status_code}")
+    
+    return response
+
 # -------------------------------------------------
 # CORS (Dev + Prod Safe)
 # -------------------------------------------------
 # Set this in production:
-# CORS_ORIGINS=https://your-frontend.vercel.app
+# CORS_ORIGINS=https://your-frontend.vercel.app,https://your-frontend-git-main.vercel.app
 #
 # Local default:
 # http://localhost:3000,http://127.0.0.1:3000
 
+# Parse CORS origins - strip whitespace and filter empty strings
+cors_origins_str = os.getenv(
+    "CORS_ORIGINS",
+    "*"  # Default to allow all origins for debugging (change in production)
+)
+
+# If CORS_ORIGINS is "*", allow all origins, otherwise parse the list
+if cors_origins_str.strip() == "*":
+    cors_origins = ["*"]
+    logger.warning("⚠️  CORS set to allow all origins (*) - not recommended for production!")
+else:
+    cors_origins = [origin.strip() for origin in cors_origins_str.split(",") if origin.strip()]
+    logger.info(f"🌐 CORS Origins configured: {cors_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv(
-        "CORS_ORIGINS",
-        "https://breatefrontend-2tlyv0nd9-osgood-andoh-juniors-projects.vercel.app,http://localhost:3000,http://127.0.0.1:3000"
-    ).split(","),
+    allow_origins=cors_origins if cors_origins != ["*"] else ["*"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
+    expose_headers=["Content-Type", "Authorization"],
 )
 
 # -------------------------------------------------
@@ -64,7 +103,10 @@ print("✅ Database schema ready.")
 # -------------------------------------------------
 API_PREFIX = "/api/v1"
 
-app.include_router(auth.router, prefix=API_PREFIX)
+# Note: auth.router contains /auth/register and /auth/login which are NOT used
+# Frontend uses /users/signup and /users/login instead
+# Keeping auth router commented out to avoid confusion
+# app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(user.router, prefix=API_PREFIX)
 app.include_router(profile.router, prefix=API_PREFIX)
 app.include_router(archetype.router, prefix=API_PREFIX)
@@ -86,7 +128,16 @@ def root():
 # -------------------------------------------------
 @app.get("/health", tags=["Health"])
 def health_check():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "api_version": "1.0.0",
+        "endpoints": {
+            "archetypes": "/api/v1/archetypes/",
+            "tiers": "/api/v1/tiers/",
+            "login": "/api/v1/users/login",
+            "signup": "/api/v1/users/signup"
+        }
+    }
 
 @app.get("/health/db", tags=["Health"])
 def check_db_connection(db: Session = Depends(get_db)):

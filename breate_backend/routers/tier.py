@@ -17,6 +17,5 @@ def get_tiers(db: Session = Depends(get_db)):
     Returns all available tiers.
     """
     tiers = db.query(models.Tier).all()
-    if not tiers:
-        raise HTTPException(status_code=404, detail="No tiers found")
-    return tiers
+    # Return empty array instead of 404 if no tiers found
+    return tiers or []
